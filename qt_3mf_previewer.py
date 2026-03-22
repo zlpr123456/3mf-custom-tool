@@ -379,18 +379,26 @@ class ThreeMfPreviewer(QMainWindow):
             self.three_mf_files = file_paths
             self.file_data = []
             
+            # 记录导入结果
+            success_files = []
+            failed_files = []
+            
             # 解析每个文件
             for i, file_path in enumerate(file_paths):
                 progress.setValue(i)
                 progress.setLabelText(f"正在解析文件 {i+1}/{len(file_paths)}...")
+                file_name = os.path.basename(file_path)
                 
                 # 同步解析每个文件（使用改进后的parse_three_mf_file方法）
                 try:
                     plate_data = self.parse_three_mf_file(file_path, i)
                     if plate_data:
                         self.file_data.extend(plate_data)
+                        success_files.append(file_name)
+                    else:
+                        failed_files.append(file_name)
                 except Exception:
-                    pass
+                    failed_files.append(file_name)
                 
                 # 处理进度对话框的取消按钮
                 if progress.wasCanceled():
@@ -421,8 +429,30 @@ class ThreeMfPreviewer(QMainWindow):
                     self.switch_file(0)
                 except Exception:
                     pass
-            else:
-                QMessageBox.critical(self, "错误", "没有找到有效的打印盘数据！")
+            
+            # 显示导入结果汇总
+            result_msg = ""
+            if success_files:
+                result_msg += f"成功导入 {len(success_files)} 个文件:\n"
+                for f in success_files[:5]:  # 最多显示5个
+                    result_msg += f"  ✓ {f}\n"
+                if len(success_files) > 5:
+                    result_msg += f"  ... 还有 {len(success_files) - 5} 个文件\n"
+            
+            if failed_files:
+                result_msg += f"\n失败导入 {len(failed_files)} 个文件:\n"
+                for f in failed_files[:5]:  # 最多显示5个
+                    result_msg += f"  ✗ {f}\n"
+                if len(failed_files) > 5:
+                    result_msg += f"  ... 还有 {len(failed_files) - 5} 个文件\n"
+                result_msg += "\n提示：文件过大或格式无效可能导致导入失败"
+            
+            if success_files and not failed_files:
+                QMessageBox.information(self, "导入完成", f"所有文件导入成功！\n共成功导入 {len(success_files)} 个文件")
+            elif success_files and failed_files:
+                QMessageBox.warning(self, "导入完成（部分失败）", result_msg)
+            elif failed_files and not success_files:
+                QMessageBox.critical(self, "导入失败", result_msg if result_msg else "所有文件导入失败，请检查文件格式和大小")
     
     def on_file_selected(self, index):
         """处理下拉框选择事件"""
