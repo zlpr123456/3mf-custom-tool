@@ -313,6 +313,7 @@ class ThreeMfPreviewer(QMainWindow):
             try:
                 plate_data = self.parse_three_mf_file(file_path, 0)
                 progress.close()
+                file_name = os.path.basename(file_path)
                 
                 if plate_data:
                     # 更新当前文件信息
@@ -323,13 +324,13 @@ class ThreeMfPreviewer(QMainWindow):
                     self.current_file_index = 0
                     # 清空并重新配置文件选择下拉框
                     self.file_selector.clear()
-                    file_name = os.path.basename(self.current_file)
+                    base_file_name = os.path.basename(self.current_file)
                     # 为每个打印盘添加一个选项
                     for i, plate in enumerate(plate_data):
                         if len(plate_data) > 1:
-                            self.file_selector.addItem(f"{file_name} - Plate {i+1}")
+                            self.file_selector.addItem(f"{base_file_name} - Plate {i+1}")
                         else:
-                            self.file_selector.addItem(file_name)
+                            self.file_selector.addItem(base_file_name)
                     # 设置默认选项为第一个打印盘
                     self.file_selector.setCurrentIndex(0)
                     # 显示第一个打印盘的文件信息和预览图
@@ -342,19 +343,25 @@ class ThreeMfPreviewer(QMainWindow):
                         self.custom_gcode = custom_gcode
                         self.display_file_info()
                         self.display_preview_image()
+                        
                         # 检查是否有G-code内容
                         if not self.gcode_content:
-                            QMessageBox.critical(self, "错误", "文件没有读取到gcode，请导入切片后的文件！")
+                            QMessageBox.critical(self, "导入失败", f"【{file_name}】没有读取到gcode，请导入切片后的文件！")
+                        else:
+                            # 导入成功提示
+                            QMessageBox.information(self, "导入成功", f"【{file_name}】导入成功。")
                 else:
                     self.display_error()
+                    QMessageBox.critical(self, "导入失败", f"【{file_name}】过大，无法解析。请调整文件内容。")
             except Exception as e:
                 progress.close()
+                file_name = os.path.basename(file_path)
                 error_msg = "3MF文件信息\n"
                 error_msg += "=" * 50 + "\n\n"
                 error_msg += f"解析3MF文件时发生异常: {str(e)}\n"
                 self.file_info = error_msg
                 self.display_file_info()
-                QMessageBox.critical(self, "错误", "解析文件时发生错误，请检查文件是否有效。")
+                QMessageBox.critical(self, "导入失败", f"【{file_name}】过大，无法解析。请调整文件内容。")
     
     def open_multiple_files(self):
         """打开多个3MF文件"""
@@ -598,19 +605,19 @@ class ThreeMfPreviewer(QMainWindow):
                                     for gcode_file in plate_gcode_files:
                                         try:
                                             # 检查文件大小，避免读取过大的文件
-                                    gcode_file_info = zf.getinfo(gcode_file)
-                                    file_size = gcode_file_info.file_size
-                                    
-                                    # 限制单个G-code文件最大为50MB
-                                    if file_size > 50 * 1024 * 1024:
-                                        plate_info += f"警告: G-code文件过大 ({file_size / 1024 / 1024:.2f}MB)，已跳过\n"
-                                        continue
-                                    
-                                    with zf.open(gcode_file, 'r') as f:
-                                        content = f.read().decode('utf-8', errors='ignore')
-                                        plate_gcode_content += content
-                                except Exception as e:
-                                    plate_info += f"读取G-code文件错误: {str(e)}\n"
+                                            gcode_file_info = zf.getinfo(gcode_file)
+                                            file_size = gcode_file_info.file_size
+                                            
+                                            # 限制单个G-code文件最大为50MB
+                                            if file_size > 50 * 1024 * 1024:
+                                                plate_info += f"警告: G-code文件过大 ({file_size / 1024 / 1024:.2f}MB)，已跳过\n"
+                                                continue
+                                            
+                                            with zf.open(gcode_file, 'r') as f:
+                                                content = f.read().decode('utf-8', errors='ignore')
+                                                plate_gcode_content += content
+                                        except Exception as e:
+                                            plate_info += f"读取G-code文件错误: {str(e)}\n"
                                     
                                     # 读取元数据
                                     plate_metadata = {}
