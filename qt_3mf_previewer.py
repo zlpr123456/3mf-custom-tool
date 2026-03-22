@@ -352,7 +352,7 @@ class ThreeMfPreviewer(QMainWindow):
                             QMessageBox.information(self, "导入成功", f"【{file_name}】导入成功。")
                 else:
                     self.display_error()
-                    QMessageBox.critical(self, "导入失败", f"【{file_name}】过大，无法解析。请调整文件内容。")
+                    QMessageBox.critical(self, "导入失败", f"【{file_name}】模型数量过多，无法解析。请调整文件内容。")
             except Exception as e:
                 progress.close()
                 file_name = os.path.basename(file_path)
@@ -361,7 +361,7 @@ class ThreeMfPreviewer(QMainWindow):
                 error_msg += f"解析3MF文件时发生异常: {str(e)}\n"
                 self.file_info = error_msg
                 self.display_file_info()
-                QMessageBox.critical(self, "导入失败", f"【{file_name}】过大，无法解析。请调整文件内容。")
+                QMessageBox.critical(self, "导入失败", f"【{file_name}】模型数量过多，无法解析。请调整文件内容。")
     
     def open_multiple_files(self):
         """打开多个3MF文件"""
@@ -445,7 +445,7 @@ class ThreeMfPreviewer(QMainWindow):
                     result_msg += f"  ✗ {f}\n"
                 if len(failed_files) > 5:
                     result_msg += f"  ... 还有 {len(failed_files) - 5} 个文件\n"
-                result_msg += "\n提示：文件过大或格式无效可能导致导入失败"
+                result_msg += "\n提示：模型数量过多或格式无效可能导致导入失败"
             
             if success_files and not failed_files:
                 QMessageBox.information(self, "导入完成", f"所有文件导入成功！\n共成功导入 {len(success_files)} 个文件")
