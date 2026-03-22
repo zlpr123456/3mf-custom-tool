@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
 3MF文件预览工具
-版本: v1.6
+版本: v1.5
 功能:
 1. 打开和预览3MF文件
 2. 查看文件中的G-code内容
 3. 支持多打印盘3MF文件
 4. 显示文件的元数据信息
 5. 添加自定义G-code代码
-6. 优化大文件解析性能
-7. 导出修改后的3MF文件
-8. 导出最终的G-code文件
+6. 导出修改后的3MF文件
+7. 导出最终的G-code文件
 """
 
 import os
@@ -312,12 +311,10 @@ class ThreeMfPreviewer(QMainWindow):
             
             # 直接调用解析方法
             try:
-                print(f"开始解析文件: {file_path}")
                 plate_data = self.parse_three_mf_file(file_path, 0)
                 progress.close()
                 
                 if plate_data:
-                    print(f"解析成功，打印盘数量: {len(plate_data)}")
                     # 更新当前文件信息
                     self.current_file = plate_data[0][0]
                     # 清空之前的文件列表和数据
@@ -347,33 +344,17 @@ class ThreeMfPreviewer(QMainWindow):
                         self.display_preview_image()
                         # 检查是否有G-code内容
                         if not self.gcode_content:
-                            print("警告: 没有读取到G-code内容")
                             QMessageBox.critical(self, "错误", "文件没有读取到gcode，请导入切片后的文件！")
                 else:
-                    print("警告: 解析返回空数据")
                     self.display_error()
-                    QMessageBox.warning(self, "警告", "未能解析文件内容，请检查文件格式。")
-            except MemoryError as e:
-                progress.close()
-                error_msg = "3MF文件信息\n"
-                error_msg += "=" * 50 + "\n\n"
-                error_msg += f"内存不足错误: 文件太大，无法分配足够内存\n"
-                error_msg += f"错误详情: {str(e)}\n"
-                self.file_info = error_msg
-                self.display_file_info()
-                QMessageBox.critical(self, "内存不足", "文件太大，系统内存不足！")
             except Exception as e:
                 progress.close()
-                import traceback
-                error_details = traceback.format_exc()
-                print(f"解析错误详情: {error_details}")
                 error_msg = "3MF文件信息\n"
                 error_msg += "=" * 50 + "\n\n"
                 error_msg += f"解析3MF文件时发生异常: {str(e)}\n"
-                error_msg += f"错误类型: {type(e).__name__}\n"
                 self.file_info = error_msg
                 self.display_file_info()
-                QMessageBox.critical(self, "错误", f"解析文件时发生错误: {str(e)}")
+                QMessageBox.critical(self, "错误", "解析文件时发生错误，请检查文件是否有效。")
     
     def open_multiple_files(self):
         """打开多个3MF文件"""
@@ -488,20 +469,10 @@ class ThreeMfPreviewer(QMainWindow):
             
             # 检查文件是否存在
             if not os.path.exists(file_path):
-                print(f"文件不存在: {file_path}")
                 return []
-            
-            # 获取文件大小
-            try:
-                file_size_bytes = os.path.getsize(file_path)
-                file_size_mb = file_size_bytes / (1024 * 1024)
-                print(f"文件大小: {file_size_mb:.2f} MB")
-            except Exception as e:
-                print(f"获取文件大小失败: {e}")
             
             # 检查文件是否为ZIP格式
             if not zipfile.is_zipfile(file_path):
-                print(f"不是有效的ZIP格式")
                 return []
             
             try:
@@ -510,7 +481,6 @@ class ThreeMfPreviewer(QMainWindow):
                     try:
                         # 获取所有文件列表
                         file_list = zf.namelist()
-                        print(f"ZIP内文件数量: {len(file_list)}")
                         
                         # 收集所有G-code文件和预览图
                         gcode_files = []
@@ -628,36 +598,19 @@ class ThreeMfPreviewer(QMainWindow):
                                     for gcode_file in plate_gcode_files:
                                         try:
                                             # 检查文件大小，避免读取过大的文件
-                                            gcode_file_info = zf.getinfo(gcode_file)
-                                            file_size = gcode_file_info.file_size
-                                            file_size_mb = file_size / 1024 / 1024
-                                            print(f"G-code文件: {gcode_file}, 大小: {file_size_mb:.2f} MB")
-                                            
-                                            # 限制单个G-code文件最大为200MB（增加上限）
-                                            if file_size > 200 * 1024 * 1024:
-                                                plate_info += f"警告: G-code文件过大 ({file_size_mb:.2f}MB)，已跳过\n"
-                                                print(f"警告: G-code文件过大，已跳过: {file_size_mb:.2f} MB")
-                                                continue
-                                            
-                                            # 分块读取大文件，减少内存压力
-                                            with zf.open(gcode_file, 'r') as f:
-                                                if file_size > 10 * 1024 * 1024:  # 大于10MB的文件分块读取
-                                                    print("使用分块读取模式...")
-                                                    content = []
-                                                    chunk_size = 1024 * 1024  # 1MB per chunk
-                                                    while True:
-                                                        chunk = f.read(chunk_size)
-                                                        if not chunk:
-                                                            break
-                                                        content.append(chunk.decode('utf-8', errors='ignore'))
-                                                    content = ''.join(content)
-                                                else:
-                                                    content = f.read().decode('utf-8', errors='ignore')
-                                                plate_gcode_content += content
-                                            print(f"G-code读取完成，内容长度: {len(plate_gcode_content)} 字符")
-                                        except Exception as e:
-                                            plate_info += f"读取G-code文件错误: {str(e)}\n"
-                                            print(f"读取G-code文件错误: {e}")
+                                    gcode_file_info = zf.getinfo(gcode_file)
+                                    file_size = gcode_file_info.file_size
+                                    
+                                    # 限制单个G-code文件最大为50MB
+                                    if file_size > 50 * 1024 * 1024:
+                                        plate_info += f"警告: G-code文件过大 ({file_size / 1024 / 1024:.2f}MB)，已跳过\n"
+                                        continue
+                                    
+                                    with zf.open(gcode_file, 'r') as f:
+                                        content = f.read().decode('utf-8', errors='ignore')
+                                        plate_gcode_content += content
+                                except Exception as e:
+                                    plate_info += f"读取G-code文件错误: {str(e)}\n"
                                     
                                     # 读取元数据
                                     plate_metadata = {}
@@ -741,34 +694,27 @@ class ThreeMfPreviewer(QMainWindow):
                                     total_time = ""
                                     
                                     if plate_gcode_content:
-                                        print("开始提取时间信息...")
-                                        # 优化：只扫描G-code的前1000行查找时间信息（时间信息通常在文件开头）
-                                        # 这对大文件可以显著提高性能
-                                        lines = plate_gcode_content.split('\n', 1000)[:1000]
-                                        gcode_header = '\n'.join(lines)
-                                        print(f"扫描G-code头部: {len(gcode_header)} 字符")
-                                        
                                         # 查找所有打印时间（支持多种格式）
                                         print_time_matches = []
                                         
                                         # 格式1: model printing time: 7h 22m 20s
-                                        matches = re.findall(r'model printing time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_header)
+                                        matches = re.findall(r'model printing time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', plate_gcode_content)
                                         print_time_matches.extend(matches)
                                         
                                         # 格式2: printing time: 7h 22m 20s
                                         if not print_time_matches:
-                                            matches = re.findall(r'printing time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_header)
+                                            matches = re.findall(r'printing time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', plate_gcode_content)
                                             print_time_matches.extend(matches)
                                         
                                         # 格式3: model printing time: 35m 20s（小于一小时）
                                         if not print_time_matches:
-                                            matches = re.findall(r'model printing time:\s*(\d+)m\s*(\d+)s', gcode_header)
+                                            matches = re.findall(r'model printing time:\s*(\d+)m\s*(\d+)s', plate_gcode_content)
                                             # 转换为 (0, minutes, seconds) 格式
                                             print_time_matches.extend([(0, match[0], match[1]) for match in matches])
                                         
                                         # 格式4: printing time: 35m 20s（小于一小时）
                                         if not print_time_matches:
-                                            matches = re.findall(r'printing time:\s*(\d+)m\s*(\d+)s', gcode_header)
+                                            matches = re.findall(r'printing time:\s*(\d+)m\s*(\d+)s', plate_gcode_content)
                                             # 转换为 (0, minutes, seconds) 格式
                                             print_time_matches.extend([(0, match[0], match[1]) for match in matches])
                                         
@@ -791,29 +737,27 @@ class ThreeMfPreviewer(QMainWindow):
                                                 # 一小时或以上，显示 HH:MM:SS
                                                 print_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
                                         
-                                        print(f"打印时间: {print_time}")
-                                        
                                         # 查找所有总估计时间（支持多种格式）
                                         total_time_matches = []
                                         
                                         # 格式1: total estimated time: 7h 29m 48s
-                                        matches = re.findall(r'total estimated time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_header)
+                                        matches = re.findall(r'total estimated time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', plate_gcode_content)
                                         total_time_matches.extend(matches)
                                         
                                         # 格式2: estimated time: 7h 29m 48s
                                         if not total_time_matches:
-                                            matches = re.findall(r'estimated time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_header)
+                                            matches = re.findall(r'estimated time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', plate_gcode_content)
                                             total_time_matches.extend(matches)
                                         
                                         # 格式3: total estimated time: 35m 20s（小于一小时）
                                         if not total_time_matches:
-                                            matches = re.findall(r'total estimated time:\s*(\d+)m\s*(\d+)s', gcode_header)
+                                            matches = re.findall(r'total estimated time:\s*(\d+)m\s*(\d+)s', plate_gcode_content)
                                             # 转换为 (0, minutes, seconds) 格式
                                             total_time_matches.extend([(0, match[0], match[1]) for match in matches])
                                         
                                         # 格式4: estimated time: 35m 20s（小于一小时）
                                         if not total_time_matches:
-                                            matches = re.findall(r'estimated time:\s*(\d+)m\s*(\d+)s', gcode_header)
+                                            matches = re.findall(r'estimated time:\s*(\d+)m\s*(\d+)s', plate_gcode_content)
                                             # 转换为 (0, minutes, seconds) 格式
                                             total_time_matches.extend([(0, match[0], match[1]) for match in matches])
                                         
@@ -902,34 +846,17 @@ class ThreeMfPreviewer(QMainWindow):
                                     # 检查文件大小，避免读取过大的文件
                                     gcode_file_info = zf.getinfo(gcode_file)
                                     file_size = gcode_file_info.file_size
-                                    file_size_mb = file_size / 1024 / 1024
-                                    print(f"G-code文件: {gcode_file}, 大小: {file_size_mb:.2f} MB")
                                     
-                                    # 限制单个G-code文件最大为200MB（增加上限）
-                                    if file_size > 200 * 1024 * 1024:
-                                        file_info += f"警告: G-code文件过大 ({file_size_mb:.2f}MB)，已跳过\n"
-                                        print(f"警告: G-code文件过大，已跳过: {file_size_mb:.2f} MB")
+                                    # 限制单个G-code文件最大为50MB
+                                    if file_size > 50 * 1024 * 1024:
+                                        file_info += f"警告: G-code文件过大 ({file_size / 1024 / 1024:.2f}MB)，已跳过\n"
                                         continue
                                     
-                                    # 分块读取大文件，减少内存压力
                                     with zf.open(gcode_file, 'r') as f:
-                                        if file_size > 10 * 1024 * 1024:  # 大于10MB的文件分块读取
-                                            print("使用分块读取模式...")
-                                            content = []
-                                            chunk_size = 1024 * 1024  # 1MB per chunk
-                                            while True:
-                                                chunk = f.read(chunk_size)
-                                                if not chunk:
-                                                    break
-                                                content.append(chunk.decode('utf-8', errors='ignore'))
-                                            content = ''.join(content)
-                                        else:
-                                            content = f.read().decode('utf-8', errors='ignore')
+                                        content = f.read().decode('utf-8', errors='ignore')
                                         gcode_content += content
-                                    print(f"G-code读取完成，内容长度: {len(gcode_content)} 字符")
                                 except Exception as e:
                                     file_info += f"读取G-code文件错误: {str(e)}\n"
-                                    print(f"读取G-code文件错误: {e}")
                             
                             # 读取元数据
                             metadata = {}
@@ -1003,34 +930,27 @@ class ThreeMfPreviewer(QMainWindow):
                             total_time = ""
                             
                             if gcode_content:
-                                print("开始提取时间信息...")
-                                # 优化：只扫描G-code的前1000行查找时间信息（时间信息通常在文件开头）
-                                # 这对大文件可以显著提高性能
-                                lines = gcode_content.split('\n', 1000)[:1000]
-                                gcode_header = '\n'.join(lines)
-                                print(f"扫描G-code头部: {len(gcode_header)} 字符")
-                                
                                 # 查找所有打印时间（支持多种格式）
                                 print_time_matches = []
                                 
                                 # 格式1: model printing time: 7h 22m 20s
-                                matches = re.findall(r'model printing time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_header)
+                                matches = re.findall(r'model printing time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_content)
                                 print_time_matches.extend(matches)
                                 
                                 # 格式2: printing time: 7h 22m 20s
                                 if not print_time_matches:
-                                    matches = re.findall(r'printing time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_header)
+                                    matches = re.findall(r'printing time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_content)
                                     print_time_matches.extend(matches)
                                 
                                 # 格式3: model printing time: 35m 20s（小于一小时）
                                 if not print_time_matches:
-                                    matches = re.findall(r'model printing time:\s*(\d+)m\s*(\d+)s', gcode_header)
+                                    matches = re.findall(r'model printing time:\s*(\d+)m\s*(\d+)s', gcode_content)
                                     # 转换为 (0, minutes, seconds) 格式
                                     print_time_matches.extend([(0, match[0], match[1]) for match in matches])
                                 
                                 # 格式4: printing time: 35m 20s（小于一小时）
                                 if not print_time_matches:
-                                    matches = re.findall(r'printing time:\s*(\d+)m\s*(\d+)s', gcode_header)
+                                    matches = re.findall(r'printing time:\s*(\d+)m\s*(\d+)s', gcode_content)
                                     # 转换为 (0, minutes, seconds) 格式
                                     print_time_matches.extend([(0, match[0], match[1]) for match in matches])
                                 
@@ -1053,29 +973,27 @@ class ThreeMfPreviewer(QMainWindow):
                                         # 一小时或以上，显示 HH:MM:SS
                                         print_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
                                 
-                                print(f"打印时间: {print_time}")
-                                
                                 # 查找所有总估计时间（支持多种格式）
                                 total_time_matches = []
                                 
                                 # 格式1: total estimated time: 7h 29m 48s
-                                matches = re.findall(r'total estimated time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_header)
+                                matches = re.findall(r'total estimated time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_content)
                                 total_time_matches.extend(matches)
                                 
                                 # 格式2: estimated time: 7h 29m 48s
                                 if not total_time_matches:
-                                    matches = re.findall(r'estimated time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_header)
+                                    matches = re.findall(r'estimated time:\s*(\d+)h\s*(\d+)m\s*(\d+)s', gcode_content)
                                     total_time_matches.extend(matches)
                                 
                                 # 格式3: total estimated time: 35m 20s（小于一小时）
                                 if not total_time_matches:
-                                    matches = re.findall(r'total estimated time:\s*(\d+)m\s*(\d+)s', gcode_header)
+                                    matches = re.findall(r'total estimated time:\s*(\d+)m\s*(\d+)s', gcode_content)
                                     # 转换为 (0, minutes, seconds) 格式
                                     total_time_matches.extend([(0, match[0], match[1]) for match in matches])
                                 
                                 # 格式4: estimated time: 35m 20s（小于一小时）
                                 if not total_time_matches:
-                                    matches = re.findall(r'estimated time:\s*(\d+)m\s*(\d+)s', gcode_header)
+                                    matches = re.findall(r'estimated time:\s*(\d+)m\s*(\d+)s', gcode_content)
                                     # 转换为 (0, minutes, seconds) 格式
                                     total_time_matches.extend([(0, match[0], match[1]) for match in matches])
                                 
@@ -1598,7 +1516,7 @@ G90; 切换回绝对坐标模式"""
         """显示关于信息"""
         about_text = """
 3MF文件预览工具
-版本: v1.6
+版本: v1.5
 
 功能:
 1. 打开和预览3MF文件
@@ -1609,7 +1527,6 @@ G90; 切换回绝对坐标模式"""
 6. 导出修改后的3MF文件
 7. 导出最终的G-code文件
 8. 换色代码差异对比
-9. 优化大文件解析性能
 
 更新内容:
 - 优化多打印盘识别和排序
@@ -1618,7 +1535,6 @@ G90; 切换回绝对坐标模式"""
 - 添加自定义G-code模板
 - 修复文件处理bug
 - 新增换色代码差异对比功能
-- v1.6: 优化大文件(>10MB)解析性能
 
 作者: 纸上滑雪
 """
